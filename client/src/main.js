@@ -82,10 +82,14 @@ function startAudioRecording(ws) {
 		format: 'S16_LE',
 		rate: 16000,
 		type: 'wav', // Output file type
+		silence: 0,
+		keepSilence: true,
 	};
 
+	const logger = console;
+
 	// Initialize the recorder
-	recorder = new AudioRecorder(options, console);
+	recorder = new AudioRecorder(options, logger);
 
 	// Start recording and pipe the audio data to the file
 	recorder.start().stream().pipe(audioFileStream);
