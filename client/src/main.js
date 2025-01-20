@@ -4,8 +4,10 @@ import started from 'electron-squirrel-startup';
 
 const WebSocket = require('ws');
 const AudioRecorder = require('node-audiorecorder');
+const fs = require('fs');
 
 let recorder;
+let audioFileStream;
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -45,10 +47,12 @@ app.whenReady().then(() => {
 		console.log('Connection established');
 
 		ws.on('message', (message) => {
-			if (message === 'startRecording') {
-				startAudioRecording(); // Trigger recording logic
-			} else if (message === 'stopRecording') {
-				stopAudioRecording(); // Stop recording logic
+			console.log(message);
+
+			if (message.toString() === 'startRecording') {
+				startAudioRecording(ws); // Trigger recording logic
+			} else if (message.toString() === 'stopRecording') {
+				stopAudioRecording(ws); // Stop recording logic
 			}
 		});
 	});
@@ -64,18 +68,45 @@ app.whenReady().then(() => {
 
 function startAudioRecording(ws) {
 	console.log('Starting audio recording...');
-	recorder = new AudioRecorder();
-	recorder.start();
-	ws.send('Recording started');
+
+	// File to save audio
+	const fileName = `recording_${Date.now()}.wav`; // Name the file with a timestamp
+	audioFileStream = fs.createWriteStream(fileName);
+
+	// Recorder options
+	const options = {
+		program: 'sox', // Use 'arecord' or 'sox', depending on the platform
+		bits: 16,
+		channels: 1,
+		encoding: 'signed-integer',
+		format: 'S16_LE',
+		rate: 16000,
+		type: 'wav', // Output file type
+	};
+
+	// Initialize the recorder
+	recorder = new AudioRecorder(options, console);
+
+	// Start recording and pipe the audio data to the file
+	recorder.start().stream().pipe(audioFileStream);
+
+	ws.send(`Recording started, saving to ${fileName}`);
+
+	// Handle errors
+	recorder.stream().on('error', (err) => {
+		console.error('Recording error:', err);
+		ws.send(`Recording error: ${err.message}`);
+	});
 }
 
-function stopAudioRecording() {
+function stopAudioRecording(ws) {
 	if (recorder) {
 		console.log('Stopping audio recording...');
-		recorder.stop();
-		ws.send('Recording stopped');
+		recorder.stop(); // Stop the recorder
+		audioFileStream.end(); // Close the file stream
+		ws.send('Recording stopped and saved');
 	} else {
-		console.log('No recording to stop');
+		ws.send('No active recording to stop');
 	}
 }
 
