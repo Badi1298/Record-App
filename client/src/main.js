@@ -3,6 +3,9 @@ import path from 'node:path';
 import started from 'electron-squirrel-startup';
 
 const WebSocket = require('ws');
+const AudioRecorder = require('node-audiorecorder');
+
+let recorder;
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -39,6 +42,8 @@ app.whenReady().then(() => {
 	const wss = new WebSocket.Server({ port: 8080 });
 
 	wss.on('connection', (ws) => {
+		console.log('Connection established');
+
 		ws.on('message', (message) => {
 			if (message === 'startRecording') {
 				startAudioRecording(); // Trigger recording logic
@@ -56,6 +61,23 @@ app.whenReady().then(() => {
 		}
 	});
 });
+
+function startAudioRecording(ws) {
+	console.log('Starting audio recording...');
+	recorder = new AudioRecorder();
+	recorder.start();
+	ws.send('Recording started');
+}
+
+function stopAudioRecording() {
+	if (recorder) {
+		console.log('Stopping audio recording...');
+		recorder.stop();
+		ws.send('Recording stopped');
+	} else {
+		console.log('No recording to stop');
+	}
+}
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
